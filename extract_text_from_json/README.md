@@ -16,8 +16,8 @@ Other code:
 * `expandURLs.py`: Python module for going a step beyond the 'expanded_url' field. Uses the internet to actually hit the URl, following all redirects, and grabs the title and other fields from the HTML page.
 
 
-[Current status: code refactored for this repo, not yet tested or all integrated. 
+[Current status: code refactored for this repo and tested; not yet all integrated. 
 TODO:
  
-* Make it possible to call stuff in expandURLs as part of everything else
+* Make it possible to call stuff in expandURLs as part of everything else (see retryBrokenLinks.py and pullAllURLs.py from old repo for examples)
 ]
