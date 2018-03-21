@@ -1,12 +1,23 @@
 source("classifyTweets.R")
 library(bit64)
-library(stringr)   # for str_replace_all
 
-# Wrapper for calling classifyTweets on URL data.
+# Wrapper for calling classifyTweets on URL data. (function filterURLDataUsingClassifier)
 # Builds 1 model per input file. Assumes input file fits in memory.
 # Work of the wrapper: 
 # -Changes data rows from tweet-URLs to tweets (for classification) and back again.
 # -Constructs tweet text "complete_raw_text" from input columns (includes RT, quoted handles and expanded URLs).
+
+
+# Quick utility function. (Note: loses dates, users and other tweet-level data.)
+# inFile: as for filterURLDataUsingClassifier().
+# outFile: tsv will contain just 2 columns: tweet_id and complete_raw_text. (File will have '.gz' appended to argument provided.)
+changeInfileToTweets = function(inFile, outFile) {
+    inData = fread(paste("gzcat", inFile), sep = "\t", quote="'")
+    tweetData = constructTweets(inData)    # contains tweet_id, complete_raw_text
+    fwrite(tweetData, file=outFile, sep="\t", quote=F)
+    system(paste("gzip -f", outFile))
+}    
+
 
 
 # inFile: a tsv.gz (or similar) containing columns tweet_id, tweet_text, shortened_url, canonical_url, retweet_prefix, quote_of_user_name, and quoted_text.
@@ -21,6 +32,7 @@ library(stringr)   # for str_replace_all
 # classifierThreshold: Normally, keep rows with scores above this value. If it's NULL or if saveDebuggingColumnsRows=T, then keep all rows.
 # saveDebuggingColumnsRows: flag for printing larger outfile to inspect scores.
 # repeatableMode: flag to set random seed
+# returnAsTweets: return one line (max) per tweet, not per URL
 filterURLDataUsingClassifier = function(inFile, outFile, keywordFile, modelFileOutStem=NULL, classifierThreshold=.8, saveDebuggingColumnsRows=FALSE,
                                         goFastUseNaiveBayes=F, noTraining=F, loadVectorizer=F, 
                                         repeatableMode = F, returnAsTweets = F) {
@@ -82,22 +94,6 @@ filterURLDataUsingClassifier = function(inFile, outFile, keywordFile, modelFileO
     
 }
 
-constructTweetsSimpler = function(inData) {
-    substituted = inData[, `:=`(updated_tweet_text = mgsub(tweet_text, shortened_url, canonical_url), 
-                            updated_quoted_text =  mgsub(quoted_text, shortened_url, canonical_url)), by=tweet_id]
-    onePerTweet = substituted[!duplicated(tweet_id),]
-    onePerTweet[, quoting := ifelse(quote_of_user_name == "", "", paste0("[QTG @", quote_of_user_name, "]"))]
-    
-    # The whole reason we expanded URLs is because the t.co versions are meaningless. Delete remaining ones,
-    # or anyway (more cautiously) the ones I expect to exist: from tweet_text to the quoted_status.
-    # Remove the final t.co from updated_tweet_text, and only if there's a quote
-    onePerTweet[quote_of_user_name != '', updated_tweet_text := sub("(?<!\\w)https?\\://t\\.co/\\S+\\s*$", "", updated_tweet_text, perl=T)]
-
-    # text: Paste back together the RT prefix, the tweet_text, the quoting marker, and the quoted_text
-    onePerTweet = onePerTweet[, .(tweet_id, complete_raw_text = paste(retweet_prefix, updated_tweet_text, 
-                                                             quoting, updated_quoted_text))]
-    return(onePerTweet[, .(tweet_id, complete_raw_text)])
-}
 
 
 # Gathers text + URLs for each tweet
@@ -107,54 +103,23 @@ constructTweets = function(inData) {
     setkey(inData, tweet_id)
     
     # Replace shortened URLs with expanded ones. 
-    
-    # (note odd special case: if tweet has no URLs we'd normally expand, but does have a quote, 
-    # we'll see the orig-or-retweeted twitter_status as a shortened_url. Ignore it.)
-    tweetURLs_orig = inData[where_url_found != 'quoted' & link_type != 'twitter_status', 
-                            .(orig_shortened = list(.SD[, shortened_url]), orig_canon = list(.SD[, canonical_url])),
-                            by = tweet_id, .SDcols=c("shortened_url", "canonical_url")]
-    tweetURLs_quoted = inData[where_url_found == 'quoted', 
-                              .(quoted_shortened = list(.SD[, shortened_url]), quoted_canon = list(.SD[, canonical_url])),
-                              by = tweet_id, .SDcols=c("shortened_url", "canonical_url")]
-    tweetData = merge(inData, tweetURLs_orig, all.x=T)  
-    tweetData = merge(tweetData, tweetURLs_quoted, all.x=T) 
-    # merges produce NULLs, but they're inside lists. Handle them during swapIn().
-    
-    onePerTweet = tweetData[!duplicated(tweet_id),]
-    onePerTweet[, updated_tweet_text := mapply(swapIn, tweet_text, orig_shortened, orig_canon)]
-    onePerTweet[, updated_quoted_text := mapply(swapIn, quoted_text, quoted_shortened, quoted_canon)]
-    
+    substituted = inData[, `:=`(updated_tweet_text = mgsub(tweet_text, shortened_url, canonical_url), 
+                                updated_quoted_text =  mgsub(quoted_text, shortened_url, canonical_url)), by=tweet_id]
+    onePerTweet = substituted[!duplicated(tweet_id),]
     onePerTweet[, quoting := ifelse(quote_of_user_name == "", "", paste0("[QTG @", quote_of_user_name, "]"))]
     
-    # The whole reason we expanded URLs is because the t.co versions are meaningless. Delete those.
-    # The only ones I expect to exist are the links from tweet_text to the quoted_status. 
-    # To be cautious: remove only the final t.co from updated_tweet_text, and only if there's a quote
+    # The whole reason we expanded URLs is because the t.co versions are meaningless. Delete remaining ones,
+    # or anyway (more cautiously) the ones I expect to exist: from tweet_text to the quoted_status.
+    # Remove the final t.co from updated_tweet_text, and only if there's a quote
     onePerTweet[quote_of_user_name != '', updated_tweet_text := sub("(?<!\\w)https?\\://t\\.co/\\S+\\s*$", "", updated_tweet_text, perl=T)]
     
     # text: Paste back together the RT prefix, the tweet_text, the quoting marker, and the quoted_text
     onePerTweet = onePerTweet[, .(tweet_id, complete_raw_text = paste(retweet_prefix, updated_tweet_text, 
-                                                             quoting, updated_quoted_text))]
-    #cleanAllTcos = F
-    #if (cleanAllTcos) {
-    #    onePerTweet[, complete_raw_text := gsub("(?<!\\w)https?\\://t\\.co/\\S+", "", complete_raw_text, perl=T)]
-    #}
-    
+                                                                      quoting, updated_quoted_text))]
     return(onePerTweet[, .(tweet_id, complete_raw_text)])
 }
 
-
 # helper for constructTweets
-swapIn = function(text, from, to) {
-    if (!is.null(to[[1]]) && !is.null(from[[1]]) && length(to) > 0 && length(from) > 0
-        && to[[1]] != '' && from[[1]] != '') {
-        namedVector = unlist(to)
-        names(namedVector) = unlist(from)
-        return(str_replace_all(text, namedVector))
-    } else {
-        return(text)
-    }
-}
-
 mgsub <- function(txt, patterns, reps, fixed = T, ...) {
     txt1 = txt[1]
     sapply(seq_len(length(patterns)), function(i) {

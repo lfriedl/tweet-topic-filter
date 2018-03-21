@@ -20,4 +20,5 @@ Other code:
 TODO:
  
 * Make it possible to call stuff in expandURLs as part of everything else (see retryBrokenLinks.py and pullAllURLs.py from old repo for examples)
+* Check and handle: if you quote someone who posts a video (e.g.), does the link to it show up twice in the tweet?
 ]

@@ -3,10 +3,10 @@ import datetime
 from tweetData import extract_tweet_info
 
 # This module pulls out the URLs in tweets.
-# Describes them by (1) where they point to = link_type
-#                       in {external (anything but twitter), twitter_status, twitter_media}
+# Describes them by (1) what they point to = link_type
+#                       among {external (anything but twitter), twitter_status, twitter_media}
 #                   (2) where in the tweet they are = where_url_found
-#                        in {orig, retweeted, quoted}
+#                        among {orig, retweeted, quoted}
 #                   (3) which user we saw them from = who_url_from
 
 # logic for traversing the json:

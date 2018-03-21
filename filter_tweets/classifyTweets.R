@@ -5,7 +5,6 @@ library(glmnet)
 library(ROCR)
 source("textProcessingForClassifier.R")
 
-# A rewrite of filterTweets.R. 
 # Uses glmnet (by default) or naive Bayes (faster, and almost as accurate)
 
 # Decisions made:
@@ -31,7 +30,7 @@ source("textProcessingForClassifier.R")
 
 # Expects input data.table to have a column called complete_raw_text.
 # Returns a data.table with original columns plus: classifier_label, white_terms, rest_of_text,
-#    raw_classifier_score, political_classifier_score
+#    raw_classifier_score, classifier_score
 classifyTweets = function(keywordFile, tweetData, modelFileOutStem, startTime, goFastUseNaiveBayes=F, noTraining=F, loadVectorizer=F) {
 
     whitelistTerms = read.table(keywordFile, sep="\n", comment.char = "", blank.lines.skip = T, 
@@ -70,11 +69,11 @@ classifyTweets = function(keywordFile, tweetData, modelFileOutStem, startTime, g
         classifierScores = glmnet.predict(model, docTermMatrix)
     }
     
-    tweetData[, c("raw_classifier_score", "political_classifier_score") := classifierScores]   # one vector of preds --> 2 new cols
+    tweetData[, c("raw_classifier_score", "classifier_score") := classifierScores]   # one vector of preds --> 2 new cols
     print(paste("Done applying classifier to data at", Sys.time() - startTime))
     
     # rawClassifierScore has predictions for whitelisted tweets. For output, change these to 1.
-    tweetData[classifier_label==T, political_classifier_score := 1]
+    tweetData[classifier_label==T, classifier_score := 1]
     
     return(tweetData)
 
@@ -224,7 +223,8 @@ trainNaiveBayesClassifier = function(docTermMatrix, classifier_labels, modelFile
             foldTrainLabels = trainLabels[foldAssignments != i]
             #foldTestLabels = trainLabels[foldAssignments == i]
         
-            foldPreds = binaryNBModel(foldTrainRows, foldTrainLabels, foldTestRows)
+            model = binaryNBModel(foldTrainRows, foldTrainLabels)
+            foldPreds = naiveBayes.predict(model, foldTestRows)
             allFoldPreds[foldAssignments == i] = foldPreds
         }
         
@@ -239,12 +239,12 @@ trainNaiveBayesClassifier = function(docTermMatrix, classifier_labels, modelFile
         }
     }
     
-    model = binaryNBModel(trainData, trainLabels, dtmBinary, modelFileOutStem, printModelCoeffs=T)
+    model = binaryNBModel(trainData, trainLabels, modelFileOutStem, printModelCoeffs=T)
     return(model)     
 }
 
 # simplest little model that takes binary features and a binary label, outputs vector of predicted probabilities P(pos | X) for testData
-binaryNBModel = function(trainData, trainLabels, testData, modelFileOutStem, laplace=1, printModelCoeffs=F) {
+binaryNBModel = function(trainData, trainLabels, modelFileOutStem = NULL, laplace=1, printModelCoeffs=F) {
     # recreating vars that were in calling function
     posRowIDs = which(trainLabels == T)
     negRowIDs = which(trainLabels == F)

@@ -6,9 +6,9 @@ import tweetURLData
 import datetime
 
 
-# These settings create a tab-separated file with at least one line per tweet, and additional lines if it contains additional URLs.
+# These settings create a tab-separated file with at least one line per tweet, and additional lines if it contains more than one URL.
 # With these defaults, output contains every tweet and every URL expansion. 
-# See arguments to tweetURLData.extract_urls_from_tweet() for ways to filter the output.
+# See arguments to tweetURLData.extract_urls_from_tweet() for ways to specify the output.
 
 
 if len(sys.argv) < 3:
@@ -30,7 +30,7 @@ with gzip.open(input_path, 'r') as fin, gzip.open(output_path, 'wb') as fout:
 
         # example syntax using a date filter
         #row_data = tweetURLData.extract_urls_from_tweet(tweet, earliest_date = datetime.date(2016, 5, 1), latest_date = datetime.date(2016, 11, 30),
-        #                                                        show_internal_twitter=True, include_non_url_tweets = True)
+        #                                                        include_non_url_tweets = True, show_internal_twitter=True)
         #if len(row_data) != 0:
         #    map(wrtr.writerow, row_data)
 

@@ -1,10 +1,18 @@
-Work in progress.
 
-Roughly, the command line call looks like:
+Easiest to call from within R, as follows:
 
+    > source("politicalFilterURLData.R")
+    > filterURLDataUsingClassifier(
+    	inFile = "../example_data/inData.tsv.gz", 
+    	outFile = "../example_data/outFile.tsv", 
+    	keywordFile = "../keyword_data/whitelist.politics3.txt")
 
-    Rscript -e
-    'source("politicalFilterURLData.R")' -e
-    'filterURLDataUsingClassifier("/inDir/tweets_with_urls/2016-08-01.tsv.gz",
-    "/outDir/tweets_with_urls_political/2016-08-01.tsv",
+Other flags may be useful too; see the source code for documentation.
+
+The same call can be made from the command line as:
+
+    Rscript -e 'source("politicalFilterURLData.R")' -e
+    'filterURLDataUsingClassifier("../example_data/inData.tsv.gz",
+    "../example_data/outFile.tsv",
     "../keyword_data/whitelist.politics3.txt")'
+
