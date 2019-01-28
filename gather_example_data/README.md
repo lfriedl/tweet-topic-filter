@@ -9,7 +9,8 @@ I can't share the Twitter data I normally work with, so I constructed an example
 	* Once that's set up, replace `twitterAuthLDF` in the code with your new version.
 	* At the command line: `mkdir sampleAccts`
 	* Run `python gather_sample_data.py`
-	* `cat sampleAccts/* > celebrities.json`
-	* `gzip celebrities.json`
+    * Move the resulting data to where the rest of this repo expects to find it, under `../example_data` and compressed: 
+	    * `cat sampleAccts/* > ../example_data/celebrities.json`
+	    * `gzip ../example_data/celebrities.json`
 	
 * Alternative route to gathering data: <http://www.docnow.io/catalog/> has Twitter data sets, which, as per Twitter's terms of service, provide only tweet IDs. The page outlines how to go about "hydrating" them into JSON files.
